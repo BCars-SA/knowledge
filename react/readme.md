@@ -9,8 +9,8 @@
 [Translation JSONs](i18n.md)
 
 ## Accessibility and ARIA
-[Accessibility](./accessibility-web/readme.md)
-[ARIA](./accessibility-web/aria.md)
+- [Accessibility](./../accessibility-web/readme.md)
+- [ARIA](./../accessibility-web/aria.md)
 
 ## Refactoring
 
