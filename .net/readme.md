@@ -28,6 +28,13 @@ It may use a variety of database technologies such as SQL, NoSQL, or object-orie
 
 ## URI naming
 DO use kebab-casing for URL path segments. If the segment refers to a JSON field, use camel casing.
+Use nouns, not verbs: `/users` and NOT `/get-users`.
+Choose plural or singular naming for your resources and maintain this convention throughout the project.
+But in general it's better to use plural naming when you address to the collection:
+- get the list of users `GET /api/users`
+- create new user `POST /api/users`
+- read a user by id `GET /api/users/:id`  or `GET /api/user/:id` - here you have choose what you prefer more and keep this convention for other resources as well
+
 
 ## API Versioning
 With `api-version` header using Microsoft.AspNetCore.Mvc.Versioning package.
