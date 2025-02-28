@@ -74,8 +74,6 @@ Use singular names for types/interfaces and other variables that represent a sin
 And for the component you can use UserPage, UserList, ProductPage, ProductList then, i.e. try to add the suffix Page, List, Button, Section to the component name.
 If you have to name the type or interface CarList and you have the component CarList, then you can use CarListData, CarListResponse, CarListType for the type/interface.
 
-````javascript
-
 ## Constants
 
 *   **UPPER_SNAKE_CASE:** Use UPPER_SNAKE_CASE for constants (e.g., `API_URL`, `MAX_VALUE`).
