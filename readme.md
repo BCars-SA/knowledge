@@ -21,3 +21,5 @@ Below are the main topics covered:
 - [Refactoring Guidelines](react/refactoring.md)
 
 Each section contains detailed documentation and examples to help you follow best practices in your projects.
+
+Copyright (c) 2025 Bcars SA.
