@@ -1,3 +1,8 @@
+# Microsoft coding-style guideline
+You can also Microsoft's guideline as a base reference:
+- [C# identifier naming rules and conventions](https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/coding-style/identifier-names) 
+- [Common C# code conventions](https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/coding-style/coding-conventions)
+
 # .NET Naming Conventions for API Controllers
 
 ## General Guidelines
