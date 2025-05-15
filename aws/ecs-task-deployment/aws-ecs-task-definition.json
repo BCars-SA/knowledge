@@ -1,0 +1,58 @@
+{
+    "family": "empservice-task-definition", 
+    "executionRoleArn": "arn:aws:iam::992382760160:role/AWSECSTasksRole",
+    "requiresCompatibilities": [
+        "EC2",
+        "FARGATE"
+    ],
+    "runtimePlatform": {
+        "cpuArchitecture": "X86_64",
+        "operatingSystemFamily": "LINUX"
+    },
+    "cpu": "256",
+    "memory": "512",
+    "networkMode": "awsvpc",     
+    "containerDefinitions": [
+        {
+            "name": "example-container",
+            "image": "992382760160.dkr.ecr.eu-central-1.amazonaws.com/example-container-repository:latest", 
+            "portMappings": [
+                {
+                    "containerPort": 80,                    
+                    "protocol": "tcp"
+                }
+            ],
+            "environment": [                
+                {
+                    "name": "PORT",
+                    "value": "80"
+                }
+            ],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "example-log-group",
+                    "awslogs-create-group": "true",
+                    "awslogs-region": "eu-central-1",
+                    "awslogs-stream-prefix": "ecs"
+                },
+                "secretOptions": []
+            },
+            "healthCheck": {
+                "command": [
+                    "CMD-SHELL",
+                    "curl -f http://localhost || exit 1"
+                ],
+                "interval": 30,
+                "timeout": 5,
+                "retries": 3
+            },
+            "systemControls": [],
+            "memory": 512,
+            "cpu": 128,
+            "essential": true,
+            "volumesFrom": [],
+            "mountPoints": []
+        }        
+    ]
+}

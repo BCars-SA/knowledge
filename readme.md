@@ -20,6 +20,12 @@ Below are the main topics covered:
 - [Internationalization (i18n)](react/i18n.md)
 - [Refactoring Guidelines](react/refactoring.md)
 
+## GitHub
+- [GitHub Usage Best Practices](github/readme.md)
+
+## AWS
+- [AWS ECS Task Deployment](aws/ecs-task-deployment/readme.md)
+
 Each section contains detailed documentation and examples to help you follow best practices in your projects.
 
 Copyright (c) 2025 Bcars SA.

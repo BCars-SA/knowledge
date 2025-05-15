@@ -1,0 +1,37 @@
+# Example of react application served with Nginx
+
+# Build client stage
+FROM node:slim AS build-client 
+WORKDIR /app
+
+COPY package.json package-lock.json ./ 
+RUN npm ci
+
+# Use docker config file
+COPY . ./
+COPY ./.env.docker ./.env.production
+# do not generate source map
+ENV GENERATE_SOURCEMAP=false
+RUN npm run build
+
+# Run tests (optional, can be removed if not needed) to ensure the build is correct
+RUN npm run test
+
+# Runtime stage
+FROM nginx:stable-alpine AS runtime
+
+WORKDIR /app
+COPY --from=build-client /app/build /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# OPTIONAL: Install curl for using for a healthcheck then
+RUN apt-get update && apt-get install -y curl
+
+# OPTIONAL: Install gettext (provides envsubst)
+RUN apt-get update && apt-get install -y gettext-base
+
+# Expose port 80 (default for Nginx)
+EXPOSE 80
+
+# Start Nginx
+CMD ["nginx", "-g", "daemon off;"]

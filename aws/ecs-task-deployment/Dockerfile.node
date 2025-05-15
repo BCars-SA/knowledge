@@ -1,0 +1,46 @@
+# Example for a node.js application
+
+# Stage 1: Build
+FROM node:slim AS build
+
+# Set the working directory
+WORKDIR /app
+
+# Copy package.json and package-lock.json
+COPY package.json package-lock.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy the application code
+COPY . .
+
+# Build the application
+RUN npm run build
+
+# Stage 2: Production
+FROM node:slim AS production
+
+# Set the working directory
+WORKDIR /app
+
+# Copy only the build output and necessary files from the build stage
+COPY --from=build /app/build ./build
+COPY --from=build /app/package.json ./
+COPY --from=build /app/package-lock.json ./
+
+# Install only production dependencies
+RUN npm ci --only=production
+
+# Install curl for using for a healthcheck then
+RUN apt-get update && apt-get install -y curl
+
+# Install gettext (provides envsubst)
+RUN apt-get update && apt-get install -y gettext-base
+
+
+# Expose the port specified in the .env file (default: 3000)
+EXPOSE ${PORT}
+
+# Command to run the application
+CMD ["node", "build/index.js"]
