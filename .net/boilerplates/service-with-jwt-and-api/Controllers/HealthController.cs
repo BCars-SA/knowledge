@@ -1,5 +1,5 @@
+using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
-using NLog;
 
 namespace Controllers;
 
@@ -20,5 +20,5 @@ public class HealthController : ControllerBase
     public IActionResult GetV2()
     {
         return Ok();
-    }    
+    }
 }

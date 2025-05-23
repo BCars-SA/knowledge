@@ -1,5 +1,5 @@
 using API.Security;
-using Microsoft.AspNetCore.Mvc.ApiExplorer;
+using Asp.Versioning;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;

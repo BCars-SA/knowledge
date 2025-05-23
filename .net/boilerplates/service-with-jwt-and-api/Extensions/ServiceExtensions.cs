@@ -1,7 +1,4 @@
 using Middleware.CurrentUserContext;
-using Microsoft.Extensions.Configuration;
-using System;
-using System.Collections.Generic;
 
 namespace Extensions;
 public static class ServiceExtensions

@@ -12,7 +12,7 @@ builder.Services.AddApiVersioning(options =>
         options.AssumeDefaultVersionWhenUnspecified = true;
         options.ApiVersionReader = new HeaderApiVersionReader(new[] { "api-version" }); // Use HeaderApiVersionReader
     })
-    .AddVersionedApiExplorer(options =>
+    .AddApiExplorer(options =>
     {
         // add the versioned api explorer, which also adds IApiVersionDescriptionProvider service
         // note: the specified format code will format the version as "major[.minor]"

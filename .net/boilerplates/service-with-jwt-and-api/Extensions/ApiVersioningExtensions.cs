@@ -1,5 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Versioning;
+using Asp.Versioning;
 
 namespace Extensions;
 public static class ApiVersionongExtensions
@@ -15,7 +14,7 @@ public static class ApiVersionongExtensions
                 options.AssumeDefaultVersionWhenUnspecified = true;
                 options.ApiVersionReader = new HeaderApiVersionReader(new[] { "api-version" }); // Use HeaderApiVersionReader
             })
-            .AddVersionedApiExplorer(options =>
+            .AddApiExplorer(options =>
             {
                 // add the versioned api explorer, which also adds IApiVersionDescriptionProvider service
                 // note: the specified format code will format the version as "major[.minor]"
