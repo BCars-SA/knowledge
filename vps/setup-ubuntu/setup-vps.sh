@@ -130,7 +130,7 @@ else
     echo "  ❌ Docker installation failed!" >&2
     exit 1
 fi
-sudo usermod -aG docker $USER
+sudo usermod -aG docker "${USER:-root}"
 
 # Mount additional volume for data persistence
 echo "\n💾 Mounting additional volume for data persistence..."
