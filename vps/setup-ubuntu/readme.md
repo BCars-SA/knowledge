@@ -40,4 +40,11 @@ chmod +x setup-vps.sh
 
 ---
 
+## Testing
+Run for testing Ubuntu setup locally:
+```bash
+docker-compose build
+docker-compose run --rm vps-test -e SSH_ADMIN_IPS=127.0.0.1
+```
+
 For more details, see comments in `setup-vps.sh`.

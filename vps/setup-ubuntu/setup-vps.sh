@@ -11,102 +11,113 @@
 # Always provide your admin IP addresses to maintain access to the server.
 #
 
-# Usage: ./setup-vps.sh [SSH_IPS]
+# Usage: ./setup-vps.sh [SSH_ADMIN_IPS]
 # Example: ./setup-vps.sh "192.168.1.100,203.0.113.0/24"
 
 set -euo pipefail
 
 # Function to show usage
 show_usage() {
-    echo "Usage: $0 [SSH_IP1,SSH_IP2,...]"
+    echo "Usage: $0 [SSH_ADMIN_IP1,SSH_ADMIN_IP2,...]"
     echo ""
     echo "Examples:"
     echo "  $0 192.168.1.100"
     echo "  $0 192.168.1.100,10.0.0.5"
     echo "  $0 203.0.113.0/24"
     echo ""
-    echo "SSH_IPS: Comma or space-separated list of IP addresses or CIDR blocks"
+    echo "SSH_ADMIN_IPS: Comma or space-separated list of IP addresses or CIDR blocks"
     echo "         that should have SSH access to this server."
     echo ""
     exit 1
 }
 
-# Parse command line arguments
+# Parse command line arguments or use SSH_ADMIN_IPS from environment
 if [ $# -eq 0 ]; then
-    echo "⚠️  WARNING: No admin IP addresses provided!"
-    echo "⚠️  SSH access will be BLOCKED for ALL IP addresses by default."
-    echo "⚠️  This may lock you out of the server!"
-    echo ""
-    read -p "Do you want to block SSH port 22 for all IPs? (type 'y' to block, 'n' to leave open): " block_ssh
-    if [ "$block_ssh" = "y" ]; then
-        SSH_IPS=""
+    if [ -n "${SSH_ADMIN_IPS:-}" ]; then
+        SSH_ADMIN_IPS="$SSH_ADMIN_IPS"
         BLOCK_SSH_PORT=true
+        echo "ℹ️  Using SSH_ADMIN_IPS from environment: $SSH_ADMIN_IPS"
     else
-        SSH_IPS=""
-        BLOCK_SSH_PORT=false
+        echo "⚠️  WARNING: No admin IP addresses provided!"
+        echo "⚠️  SSH access will be BLOCKED for ALL IP addresses by default."
+        echo "⚠️  This may lock you out of the server!"
+        echo ""
+        read -p "Do you want to block SSH port 22 for all IPs? (type 'y' to block, 'n' to leave open): " block_ssh
+        if [ "$block_ssh" = "y" ]; then
+            SSH_ADMIN_IPS=""
+            BLOCK_SSH_PORT=true
+        else
+            SSH_ADMIN_IPS=""
+            BLOCK_SSH_PORT=false
+        fi
     fi
 elif [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
     show_usage
 else
-    SSH_IPS="$1"
+    SSH_ADMIN_IPS="$1"
     BLOCK_SSH_PORT=true
 fi
 
 # Normalize separators (commas -> spaces)
-SSH_IPS="${SSH_IPS//,/ }"
+SSH_ADMIN_IPS="${SSH_ADMIN_IPS//,/ }"
 
-# Set sane defaults
-sudo ufw default deny incoming
-sudo ufw default allow outgoing
+# Detect if running inside Docker and skip UFW/firewall setup if so
+if [ -f /.dockerenv ]; then
+    echo "⚠️  Skipping UFW/firewall setup: running inside Docker container."
+else
+    # Set sane defaults
+    sudo ufw default deny incoming
+    sudo ufw default allow outgoing
 
-# Configure SSH access
-if [ -n "$SSH_IPS" ]; then
-    echo "🔐 Configuring SSH access for admin IPs: $SSH_IPS"
-    # Allow SSH only from each admin IP/CIDR
-    for ip in $SSH_IPS; do
-        # Basic validation: IPv4, IPv4/CIDR, or IPv6/CIDR-ish. Skip obviously invalid tokens.
-        if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}(/([0-9]{1,2}))?$ ]] || [[ "$ip" =~ ^[0-9a-fA-F:]+(/([0-9]{1,3}))?$ ]]; then
-            echo "  ✅ Allowing SSH from: $ip"
-            sudo ufw allow from "$ip" to any port 22 proto tcp
-        else
-            echo "  ⚠️  Warning: skipping invalid IP/CIDR: $ip" >&2
+    # Configure SSH access
+    if [ -n "$SSH_ADMIN_IPS" ]; then
+        echo "🔐 Configuring SSH access for admin IPs: $SSH_ADMIN_IPS"
+        # Allow SSH only from each admin IP/CIDR
+        for ip in $SSH_ADMIN_IPS; do
+            # Basic validation: IPv4, IPv4/CIDR, or IPv6/CIDR-ish. Skip obviously invalid tokens.
+            if [[ "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}(/([0-9]{1,2}))?$ ]] || [[ "$ip" =~ ^[0-9a-fA-F:]+(/([0-9]{1,3}))?$ ]]; then
+                echo "  ✅ Allowing SSH from: $ip"
+                sudo ufw allow from "$ip" to any port 22 proto tcp
+            else
+                echo "  ⚠️  Warning: skipping invalid IP/CIDR: $ip" >&2
+            fi
+        done
+        # Explicitly deny SSH from all other sources
+        if [ "$BLOCK_SSH_PORT" = true ]; then
+            sudo ufw deny 22/tcp
         fi
-    done
-    # Explicitly deny SSH from all other sources
-    if [ "$BLOCK_SSH_PORT" = true ]; then
-        sudo ufw deny 22/tcp
-    fi
-else
-    if [ "$BLOCK_SSH_PORT" = true ]; then
-        echo "🔐 No admin IPs provided - SSH will be BLOCKED for all addresses"
-        echo "⚠️  Make sure you have alternative access (console, etc.) to manage this server"
-        sudo ufw deny 22/tcp
     else
-        echo "🔓 SSH port 22 will remain open for all IPs (not recommended for production)"
+        if [ "$BLOCK_SSH_PORT" = true ]; then
+            echo "🔐 No admin IPs provided - SSH will be BLOCKED for all addresses"
+            echo "⚠️  Make sure you have alternative access (console, etc.) to manage this server"
+            sudo ufw deny 22/tcp
+        else
+            echo "🔓 SSH port 22 will remain open for all IPs (not recommended for production)"
+        fi
     fi
-fi
 
-# Enable UFW non-interactively (safe for automation)
-sudo ufw --force enable
+    # Enable UFW non-interactively (safe for automation)
+    sudo ufw --force enable
 
-# Show firewall status for verification
-echo ""
-echo "🔥 Firewall Configuration Summary:"
-sudo ufw status verbose
+    # Show firewall status for verification
+    echo ""
+    echo "🔥 Firewall Configuration Summary:"
+    sudo ufw status verbose
 
-echo ""
-echo "📋 SSH Access Summary:"
-if [ -n "$SSH_IPS" ]; then
-    echo "  ✅ SSH allowed from: $SSH_IPS"
-    if [ "$BLOCK_SSH_PORT" = true ]; then
-        echo "  🚫 SSH blocked for all other IP addresses"
-    fi
-else
-    if [ "$BLOCK_SSH_PORT" = true ]; then
-        echo "  🚫 SSH BLOCKED for all IP addresses"
-        echo "  ⚠️  Ensure you have console/alternative access to manage this server"
+    echo ""
+    echo "📋 SSH Access Summary:"
+    if [ -n "$SSH_ADMIN_IPS" ]; then
+        echo "  ✅ SSH allowed from: $SSH_ADMIN_IPS"
+        if [ "$BLOCK_SSH_PORT" = true ]; then
+            echo "  🚫 SSH blocked for all other IP addresses"
+        fi
     else
-        echo "  ⚠️  SSH port 22 is OPEN for all IPs (not recommended for production)"
+        if [ "$BLOCK_SSH_PORT" = true ]; then
+            echo "  🚫 SSH BLOCKED for all IP addresses"
+            echo "  ⚠️  Ensure you have console/alternative access to manage this server"
+        else
+            echo "  ⚠️  SSH port 22 is OPEN for all IPs (not recommended for production)"
+        fi
     fi
 fi
 
