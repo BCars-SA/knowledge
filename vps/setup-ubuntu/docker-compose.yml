@@ -1,0 +1,15 @@
+services:
+  vps-test:
+    image: ubuntu:latest
+    container_name: vps-setup-test
+    tty: true
+    stdin_open: true
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+    volumes:
+      - ./test-data:/mnt/data
+    command: >
+      bash -c "apt-get update && apt-get install -y curl sudo ufw && \
+      curl -fsSL https://raw.githubusercontent.com/BCars-SA/knowledge/main/vps/setup/setup-vps.sh -o /root/setup-vps.sh && \
+      chmod +x /root/setup-vps.sh && \
+      /root/setup-vps.sh || bash"
