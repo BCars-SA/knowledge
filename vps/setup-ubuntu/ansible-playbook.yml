@@ -3,11 +3,15 @@
   hosts: all
   become: yes
   vars:
-    allowed_ssh_ips: "{{ ansible_env.SSH_ADMIN_IPS | default('') | split(',') | select('match', '^\\s*\\S+\\s*$') | map('trim') | list }}"
+    allowed_ssh_ips: "{{ SSH_ADMIN_IPS | default('') | split(',') | map('trim') | reject('equalto', '') | list }}"
     ssh_port: 22
-    additional_volume_device: "{{ ansible_env.VOLUME_DEVICE | default('auto') }}"
+    additional_volume_device: "{{ VOLUME_DEVICE | default('auto') }}"
     
   tasks:
+    - name: The list of allowed ssh ips passed
+      debug:
+        var: allowed_ssh_ips
+
     - name: Update apt cache
       apt:
         update_cache: yes
@@ -59,7 +63,6 @@
           PermitRootLogin no
           PasswordAuthentication yes
           PubkeyAuthentication yes
-          AuthenticationMethods publickey,password
           MaxAuthTries 3
           ClientAliveInterval 300
           ClientAliveCountMax 2
@@ -74,27 +77,28 @@
           UsePAM yes
         marker: "# {mark} ANSIBLE MANAGED SSH CONFIG"
         backup: yes
-      notify: restart sshd
+      notify: restart ssh
 
     - name: Create SSH conditional access configuration
-      template:
+      copy:
         dest: /etc/ssh/sshd_config.d/conditional_access.conf
         content: |
           # Allow password auth only from specific IPs
           {% for ip in allowed_ssh_ips %}
           {% if ip %}
           Match Address {{ ip }}
+              PermitRootLogin yes
               PasswordAuthentication yes
-              AuthenticationMethods password,publickey
+              PubkeyAuthentication yes
           {% endif %}
           {% endfor %}
           
           # Default: key-only authentication for all other IPs
           Match Address *,!{{ allowed_ssh_ips | join(',!') if allowed_ssh_ips else '0.0.0.0/0' }}
               PasswordAuthentication no
-              AuthenticationMethods publickey
+              PubkeyAuthentication yes
       when: allowed_ssh_ips | length > 0
-      notify: restart sshd
+      notify: restart ssh
 
     - name: Set up UFW firewall defaults
       ufw:
@@ -290,9 +294,9 @@
           - "Additional volume: {{ '/mnt/data mounted from ' + target_device if device_exists else '/mnt/data created as regular directory (no additional block device found)' }}"
 
   handlers:
-    - name: restart sshd
+    - name: restart ssh
       systemd:
-        name: sshd
+        name: ssh
         state: restarted
 
     - name: restart fail2ban

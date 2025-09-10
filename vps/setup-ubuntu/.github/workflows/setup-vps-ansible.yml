@@ -1,4 +1,4 @@
-name: Deploy VPS Setup with Ansible
+name: Setup Ubuntu VPS with Ansible
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ on:
       ssh_user:
         description: 'SSH username for VPS'
         required: true
-        default: 'ubuntu'
+        default: 'admin'
         type: string
 
 jobs:
@@ -47,14 +47,14 @@ jobs:
     - name: Run Ansible playbook
       uses: dawidd6/action-ansible-playbook@v2
       with:
-        playbook: vps/setup-ubuntu/ansible-playbook.yml
+        playbook: ansible-playbook.yml
         directory: ./
         key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
         inventory: |
           [vps]
           ${{ inputs.vps_host }} ansible_user=${{ inputs.ssh_user }}
         options: |
-          --extra-vars "SSH_ADMIN_IPS=${{ inputs.ssh_admin_ips }}"
+          --extra-vars SSH_ADMIN_IPS=${{ inputs.ssh_admin_ips }}
 
     - name: Verify Docker installation
       run: |
