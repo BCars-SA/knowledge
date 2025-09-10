@@ -1,0 +1,301 @@
+---
+- name: Setup Ubuntu VPS for Docker deployments
+  hosts: all
+  become: yes
+  vars:
+    allowed_ssh_ips: "{{ ansible_env.SSH_ADMIN_IPS | default('') | split(',') | select('match', '^\\s*\\S+\\s*$') | map('trim') | list }}"
+    ssh_port: 22
+    additional_volume_device: "{{ ansible_env.VOLUME_DEVICE | default('auto') }}"
+    
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install essential packages
+      apt:
+        name:
+          - curl
+          - wget
+          - git
+          - ufw
+          - fail2ban
+          - unattended-upgrades
+          - apt-transport-https
+          - ca-certificates
+          - gnupg
+          - lsb-release
+        state: present
+
+    - name: Configure automatic security updates
+      copy:
+        dest: /etc/apt/apt.conf.d/50unattended-upgrades
+        content: |
+          Unattended-Upgrade::Allowed-Origins {
+              "${distro_id}:${distro_codename}-security";
+              "${distro_id}ESMApps:${distro_codename}-apps-security";
+              "${distro_id}ESM:${distro_codename}-infra-security";
+          };
+          Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+          Unattended-Upgrade::MinimalSteps "true";
+          Unattended-Upgrade::Remove-Unused-Dependencies "true";
+          Unattended-Upgrade::Automatic-Reboot "false";
+
+    - name: Enable automatic updates
+      copy:
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        content: |
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Download-Upgradeable-Packages "1";
+          APT::Periodic::AutocleanInterval "7";
+          APT::Periodic::Unattended-Upgrade "1";
+
+    - name: Configure SSH for security
+      blockinfile:
+        path: /etc/ssh/sshd_config
+        block: |
+          # Security hardening
+          PermitRootLogin no
+          PasswordAuthentication yes
+          PubkeyAuthentication yes
+          AuthenticationMethods publickey,password
+          MaxAuthTries 3
+          ClientAliveInterval 300
+          ClientAliveCountMax 2
+          Protocol 2
+          IgnoreRhosts yes
+          HostbasedAuthentication no
+          PermitEmptyPasswords no
+          ChallengeResponseAuthentication no
+          KerberosAuthentication no
+          GSSAPIAuthentication no
+          X11Forwarding no
+          UsePAM yes
+        marker: "# {mark} ANSIBLE MANAGED SSH CONFIG"
+        backup: yes
+      notify: restart sshd
+
+    - name: Create SSH conditional access configuration
+      template:
+        dest: /etc/ssh/sshd_config.d/conditional_access.conf
+        content: |
+          # Allow password auth only from specific IPs
+          {% for ip in allowed_ssh_ips %}
+          {% if ip %}
+          Match Address {{ ip }}
+              PasswordAuthentication yes
+              AuthenticationMethods password,publickey
+          {% endif %}
+          {% endfor %}
+          
+          # Default: key-only authentication for all other IPs
+          Match Address *,!{{ allowed_ssh_ips | join(',!') if allowed_ssh_ips else '0.0.0.0/0' }}
+              PasswordAuthentication no
+              AuthenticationMethods publickey
+      when: allowed_ssh_ips | length > 0
+      notify: restart sshd
+
+    - name: Set up UFW firewall defaults
+      ufw:
+        direction: "{{ item.direction }}"
+        policy: "{{ item.policy }}"
+      loop:
+        - { direction: 'incoming', policy: 'deny' }
+        - { direction: 'outgoing', policy: 'allow' }
+
+    - name: Allow SSH from specific IPs
+      ufw:
+        rule: allow
+        port: "{{ ssh_port }}"
+        proto: tcp
+        src: "{{ item }}"
+        comment: "SSH access from admin IP"
+      loop: "{{ allowed_ssh_ips }}"
+      when: allowed_ssh_ips | length > 0
+
+    - name: Allow SSH from anywhere if no IPs specified (not recommended)
+      ufw:
+        rule: allow
+        port: "{{ ssh_port }}"
+        proto: tcp
+        comment: "SSH access (open - not recommended for production)"
+      when: allowed_ssh_ips | length == 0
+
+    - name: Allow HTTP and HTTPS
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - "80"
+        - "443"
+
+    - name: Enable UFW
+      ufw:
+        state: enabled
+
+    - name: Configure fail2ban for SSH
+      copy:
+        dest: /etc/fail2ban/jail.local
+        content: |
+          [sshd]
+          enabled = true
+          port = {{ ssh_port }}
+          filter = sshd
+          logpath = /var/log/auth.log
+          maxretry = 3
+          bantime = 3600
+          findtime = 600
+        backup: yes
+      notify: restart fail2ban
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+
+    - name: Install Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+
+    - name: Add users to docker group
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+
+    - name: Enable and start Docker service
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+
+    - name: Install Docker Compose (standalone)
+      get_url:
+        url: "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64"
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
+
+    - name: Create data directory
+      file:
+        path: /opt/docker-data
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: docker
+        mode: '0755'
+
+    - name: Find available block devices
+      shell: |
+        for dev in /dev/sd[b-z]; do
+          if [ -b "$dev" ] && ! grep -q "$dev" /proc/mounts; then
+            echo "$dev"
+            break
+          fi
+        done
+      register: available_device
+      changed_when: false
+      failed_when: false
+
+    - name: Set device variable
+      set_fact:
+        target_device: "{{ available_device.stdout.strip() }}"
+        device_exists: "{{ available_device.stdout.strip() | length > 0 }}"
+
+    - name: Create mount point for additional volume
+      file:
+        path: /mnt/data
+        state: directory
+        mode: '0755'
+      when: device_exists
+
+    - name: Mount additional device to /mnt/data
+      mount:
+        path: /mnt/data
+        src: "{{ target_device }}"
+        fstype: ext4
+        opts: defaults
+        state: mounted
+      when: device_exists
+      ignore_errors: yes
+
+    - name: Add device to fstab for persistent mounting
+      mount:
+        path: /mnt/data
+        src: "{{ target_device }}"
+        fstype: ext4
+        opts: defaults
+        state: present
+      when: device_exists
+      ignore_errors: yes
+
+    - name: Set ownership of mounted volume
+      file:
+        path: /mnt/data
+        owner: "{{ ansible_user }}"
+        group: docker
+        mode: '0755'
+        recurse: no
+      when: device_exists
+      ignore_errors: yes
+
+    - name: Create fallback data directory when no additional volume
+      file:
+        path: /mnt/data
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: docker
+        mode: '0755'
+      when: not device_exists
+
+    - name: Set timezone to UTC
+      timezone:
+        name: UTC
+
+    - name: Configure logrotate for Docker
+      copy:
+        dest: /etc/logrotate.d/docker
+        content: |
+          /var/lib/docker/containers/*/*.log {
+              rotate 7
+              daily
+              compress
+              missingok
+              delaycompress
+              copytruncate
+          }
+
+    - name: Show setup summary
+      debug:
+        msg:
+          - "VPS setup completed successfully!"
+          - "Docker and Docker Compose installed"
+          - "UFW firewall configured"
+          - "SSH access restricted to: {{ allowed_ssh_ips | join(', ') if allowed_ssh_ips else 'ALL IPs (not recommended)' }}"
+          - "Fail2ban configured for SSH protection"
+          - "Automatic security updates enabled"
+          - "Data directory: /opt/docker-data"
+          - "Additional volume: {{ '/mnt/data mounted from ' + target_device if device_exists else '/mnt/data created as regular directory (no additional block device found)' }}"
+
+  handlers:
+    - name: restart sshd
+      systemd:
+        name: sshd
+        state: restarted
+
+    - name: restart fail2ban
+      systemd:
+        name: fail2ban
+        state: restarted

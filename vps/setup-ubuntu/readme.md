@@ -1,50 +1,97 @@
-# VPS Setup Scripts
+# Ansible VPS Setup
 
-This folder contains scripts for securely configuring a VPS with **Ubuntu** for Docker-based deployments, with a focus on automation, security, and GitHub Actions integration.
+This directory contains Ansible playbooks and GitHub Actions workflows for setting up Ubuntu VPS servers with Docker and security best practices.
 
 ## Files
 
-- **setup-vps.sh**: Main setup script for preparing a new VPS. Handles firewall configuration, Docker installation, volume mounting, and (optionally) SSH key generation for GitHub Actions deployments.
-- **create-ssh-keys.sh**: Helper script (downloaded automatically if missing) to generate SSH keys for GitHub Actions deployment.
+- **ansible-playbook.yml**: Main Ansible playbook for VPS setup
+- **setup-vps-ansible.yml**: GitHub Actions workflow (located in `.github/workflows/`)
+
+## Features
+
+### Security
+- UFW firewall with restrictive rules
+- SSH hardening with conditional password authentication
+- Fail2ban for SSH brute force protection
+- Automatic security updates
+- Non-root user setup
+
+### Docker Setup
+- Docker CE and Docker Compose installation
+- User added to docker group
+- Docker logging configuration
+- Additional volume mounting (/dev/sdb to /mnt/data) for persistent storage
+
+### System Hardening
+- Essential security packages
+- Timezone configuration
+- Log rotation setup
+- Data directory creation (/opt/docker-data)
+- Additional volume setup (/mnt/data) for container persistent storage
 
 ## Usage
 
-### 1. Upload or download `setup-vps.sh` to your VPS
+### Prerequisites
 
-### 2. Run the script (as your regular user, not root):
+1. **SSH Access**: You need SSH key access to your VPS
+2. **GitHub Secrets**: Add `VPS_SSH_PRIVATE_KEY` to your repository secrets
+
+### Running via GitHub Actions
+
+1. Go to **Actions** tab in your GitHub repository
+2. Select **Deploy VPS Setup with Ansible** workflow
+3. Click **Run workflow** and provide:
+   - **VPS Host**: IP address or hostname of your server
+   - **SSH Admin IPs**: Comma-separated list (e.g., `203.0.113.0/24,198.51.100.42`)
+   - **SSH User**: Username for SSH connection (default: `ubuntu`)
+
+### Running Locally
 
 ```bash
-chmod +x setup-vps.sh
-./setup-vps.sh [SSH_IPS]
+# Install Ansible
+pip install ansible
+
+# Create inventory file
+cat > inventory.ini << EOF
+[vps]
+YOUR_VPS_IP ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/your_key
+EOF
+
+# Set environment variable
+export SSH_ADMIN_IPS="203.0.113.0/24,198.51.100.42"
+
+# Run playbook
+ansible-playbook -i inventory.ini ansible-playbook.yml
 ```
-- `[SSH_IPS]` is a comma- or space-separated list of IP addresses or CIDR blocks allowed SSH access (e.g., `192.168.1.100,203.0.113.0/24`).
-- If omitted, the script will prompt you to confirm if you want to block SSH for all IPs (not recommended unless you have console access).
 
-### 3. Script Actions
-- **Firewall (UFW) Configuration**: Sets default deny/allow rules, restricts SSH to provided IPs, and enables UFW.
-- **Docker & Docker Compose Installation**: Installs Docker using the official script and adds your user to the `docker` group.
-- **Volume Mounting**: Mounts `/dev/sdb` to `/mnt/data` for persistent storage and updates `/etc/fstab`.
-- **GitHub Actions SSH Key Setup**: Prompts to generate SSH keys for GitHub Actions deployment. If accepted, downloads and runs `create-ssh-keys.sh` if not present.
+## SSH Access Configuration
 
-### 4. Output
-- The script echoes status and results for each step, including warnings and errors.
+The playbook configures **conditional SSH authentication**:
+
+- **From Admin IPs**: Both password and key authentication allowed
+- **From Other IPs**: Only SSH key authentication allowed
+- **Password authentication** is restricted to specified admin IPs only
+
+## Environment Variables
+
+- `SSH_ADMIN_IPS`: Comma-separated list of IP addresses/CIDR blocks for SSH password access
 
 ## Security Notes
-- The script configures a strict firewall and may block SSH if not used carefully. Always provide your admin IPs or ensure you have console access.
-- SSH keys for GitHub Actions are generated in the current user's home directory (not as root).
 
-## Example
-```bash
-./setup-vps.sh "203.0.113.0/24,198.51.100.42"
-```
+- Always use specific IP ranges instead of allowing global access
+- Keep your SSH private keys secure
+- Regularly update the allowed IP list
+- Monitor fail2ban logs for suspicious activity
 
----
+## Post-Setup
 
-## Testing
-Run for testing Ubuntu setup locally:
-```bash
-docker-compose build
-docker-compose run --rm vps-test -e SSH_ADMIN_IPS=127.0.0.1
-```
+After running the playbook:
 
-For more details, see comments in `setup-vps.sh`.
+1. **Verify firewall**: `sudo ufw status`
+2. **Check Docker**: `docker --version && docker compose version`  
+3. **Test SSH**: Try connecting from allowed/blocked IPs
+4. **Review logs**: Check `/var/log/fail2ban.log` and `/var/log/auth.log`
+5. **Verify volumes**: 
+   - Check `/opt/docker-data` directory exists
+   - If `/dev/sdb` was available: `df -h | grep /mnt/data` to verify mounting
+   - Test volume permissions for Docker containers

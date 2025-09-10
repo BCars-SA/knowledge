@@ -1,0 +1,67 @@
+name: Deploy VPS Setup with Ansible
+
+on:
+  workflow_dispatch:
+    inputs:
+      vps_host:
+        description: 'VPS IP address or hostname'
+        required: true
+        type: string
+      ssh_admin_ips:
+        description: 'Comma-separated list of admin IPs for SSH access'
+        required: true
+        type: string
+      ssh_user:
+        description: 'SSH username for VPS'
+        required: true
+        default: 'ubuntu'
+        type: string
+
+jobs:
+  setup-vps:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Create Ansible inventory
+      run: |
+        mkdir -p ansible
+        cat > ansible/inventory.ini << EOF
+        [vps]
+        ${{ inputs.vps_host }} ansible_user=${{ inputs.ssh_user }} ansible_ssh_private_key_file=~/.ssh/deploy_key
+        EOF
+
+    - name: Create SSH key from secret
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.VPS_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+        chmod 600 ~/.ssh/deploy_key
+        ssh-keyscan -H ${{ inputs.vps_host }} >> ~/.ssh/known_hosts
+
+    - name: Test SSH connection
+      run: |
+        ssh -i ~/.ssh/deploy_key -o ConnectTimeout=10 ${{ inputs.ssh_user }}@${{ inputs.vps_host }} "echo 'SSH connection successful'"
+
+    - name: Run Ansible playbook
+      uses: dawidd6/action-ansible-playbook@v2
+      with:
+        playbook: vps/setup-ubuntu/ansible-playbook.yml
+        directory: ./
+        key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+        inventory: |
+          [vps]
+          ${{ inputs.vps_host }} ansible_user=${{ inputs.ssh_user }}
+        options: |
+          --extra-vars "SSH_ADMIN_IPS=${{ inputs.ssh_admin_ips }}"
+
+    - name: Verify Docker installation
+      run: |
+        ssh -i ~/.ssh/deploy_key ${{ inputs.ssh_user }}@${{ inputs.vps_host }} \
+          "docker --version && docker compose version"
+
+    - name: Clean up SSH key
+      if: always()
+      run: |
+        rm -f ~/.ssh/deploy_key
