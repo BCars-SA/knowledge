@@ -108,23 +108,12 @@
         - { direction: 'incoming', policy: 'deny' }
         - { direction: 'outgoing', policy: 'allow' }
 
-    - name: Allow SSH from specific IPs
+    - name: Allow SSH (always, restrictions in SSH config)
       ufw:
         rule: allow
         port: "{{ ssh_port }}"
         proto: tcp
-        src: "{{ item }}"
-        comment: "SSH access from admin IP"
-      loop: "{{ allowed_ssh_ips }}"
-      when: allowed_ssh_ips | length > 0
-
-    - name: Allow SSH from anywhere if no IPs specified
-      ufw:
-        rule: allow
-        port: "{{ ssh_port }}"
-        proto: tcp
-        comment: "SSH access (check conditional config for restrictions)"
-      when: allowed_ssh_ips | length == 0
+        comment: "SSH access (see SSH config for restrictions)"
 
     - name: Allow HTTP and HTTPS
       ufw:
