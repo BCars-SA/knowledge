@@ -4,13 +4,21 @@
   become: yes
   vars:
     allowed_ssh_ips: "{{ SSH_ADMIN_IPS | default('') | split(',') | map('trim') | reject('equalto', '') | list }}"
-    ssh_port: {{ SSH_PORT | default(22) }}
+    ssh_port: "{{ SSH_PORT | default(22) }}"
     additional_volume_device: "{{ VOLUME_DEVICE | default('auto') }}"
     
   tasks:
     - name: The list of allowed ssh ips passed
       debug:
         var: allowed_ssh_ips
+
+    # Gather package and service facts for conditional removals
+    - name: Gather installed package facts
+      package_facts:
+        manager: auto
+
+    - name: Gather service facts
+      service_facts:
 
     - name: Update apt cache
       apt:
@@ -54,6 +62,14 @@
           APT::Periodic::Download-Upgradeable-Packages "1";
           APT::Periodic::AutocleanInterval "7";
           APT::Periodic::Unattended-Upgrade "1";
+
+    - name: Configure SSH port
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?Port '
+        line: 'Port {{ ssh_port }}'
+        backup: yes
+      notify: restart ssh
 
     - name: Configure SSH for security
       blockinfile:
@@ -283,6 +299,30 @@
         name: cloud-init
         state: absent
         purge: yes
+      when: "'cloud-init' in ansible_facts.packages"
+      ignore_errors: yes
+
+    - name: Check if snapd is installed
+      command: which snap
+      register: snap_check
+      changed_when: false
+      failed_when: false
+
+    - name: Get list of installed snaps
+      command: snap list
+      register: snap_list
+      when: snap_check.rc == 0
+      changed_when: false
+      failed_when: false
+
+    - name: Remove canonical-livepatch
+      snap:
+        name: canonical-livepatch
+        state: absent
+      when: 
+        - snap_check.rc == 0
+        - snap_list.stdout is defined
+        - "'canonical-livepatch' in snap_list.stdout"
       ignore_errors: yes
 
     - name: Remove snapd
@@ -290,6 +330,7 @@
         name: snapd
         state: absent
         purge: yes
+      when: "'snapd' in ansible_facts.packages"
       ignore_errors: yes
 
     - name: Remove popularity-contest
@@ -297,12 +338,7 @@
         name: popularity-contest
         state: absent
         purge: yes
-      ignore_errors: yes
-
-    - name: Remove canonical-livepatch
-      snap:
-        name: canonical-livepatch
-        state: absent
+      when: "'popularity-contest' in ansible_facts.packages"
       ignore_errors: yes
 
     - name: Disable apport crash reporting
@@ -310,6 +346,7 @@
         path: /etc/default/apport
         regexp: '^enabled='
         line: 'enabled=0'
+      when: ansible_facts['distribution'] == 'Ubuntu'
       ignore_errors: yes
 
     - name: Stop and disable apport service
@@ -318,6 +355,7 @@
         enabled: no
         state: stopped
         masked: yes
+      when: "'apport.service' in ansible_facts.services"
       ignore_errors: yes
 
     - name: Stop and disable whoopsie
@@ -326,6 +364,7 @@
         enabled: no
         state: stopped
         masked: yes
+      when: "'whoopsie.service' in ansible_facts.services"
       ignore_errors: yes
 
     - name: Disable motd-news
@@ -333,12 +372,12 @@
         path: /etc/update-motd.d/50-motd-news
         mode: '0644'
         state: absent
+      when: ansible_facts['distribution'] == 'Ubuntu'
       ignore_errors: yes
 
     - name: Disable Ubuntu Pro/Advantage apt news
       command: pro config set apt_news=false
-      args:
-        warn: false
+      when: ansible_facts['distribution'] == 'Ubuntu'
       ignore_errors: yes
 
     - name: Show setup summary

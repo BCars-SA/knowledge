@@ -7,8 +7,12 @@ on:
         description: 'VPS IP address or hostname'
         required: true
         type: string
-      ssh_port:
-        description: 'SSH port (default: 22)'
+      new_ssh_port:
+        description: 'New SSH port (f.e. 41222)'
+        required: true
+        type: number
+      current_ssh_port:
+        description: 'Current SSH port (default: 22)'
         required: true
         default: 22
         type: number
@@ -35,7 +39,7 @@ jobs:
         mkdir -p ansible
         cat > ansible/inventory.ini << EOF
         [vps]
-        ${{ inputs.vps_host }} ansible_user=${{ inputs.ssh_user }} ansible_ssh_private_key_file=~/.ssh/deploy_key
+        ${{ inputs.vps_host }} ansible_user=${{ inputs.ssh_user }} ansible_ssh_private_key_file=~/.ssh/deploy_key ansible_port=${{ inputs.current_ssh_port }}
         EOF
 
     - name: Create SSH key from secret
@@ -43,11 +47,11 @@ jobs:
         mkdir -p ~/.ssh
         echo "${{ secrets.VPS_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
         chmod 600 ~/.ssh/deploy_key
-        ssh-keyscan -H ${{ inputs.vps_host }} >> ~/.ssh/known_hosts
+        ssh-keyscan -H -p ${{ inputs.current_ssh_port }} ${{ inputs.vps_host }} >> ~/.ssh/known_hosts
 
     - name: Test SSH connection
       run: |
-        ssh -i ~/.ssh/deploy_key -o ConnectTimeout=10 ${{ inputs.ssh_user }}@${{ inputs.vps_host }} "echo 'SSH connection successful'"
+        ssh -i ~/.ssh/deploy_key -p ${{ inputs.current_ssh_port }} -o ConnectTimeout=10 ${{ inputs.ssh_user }}@${{ inputs.vps_host }} "echo 'SSH connection successful (using port ${{ inputs.current_ssh_port }})'"
 
     - name: Run Ansible playbook
       uses: dawidd6/action-ansible-playbook@v2
@@ -57,13 +61,13 @@ jobs:
         key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
         inventory: |
           [vps]
-          ${{ inputs.vps_host }} ansible_user=${{ inputs.ssh_user }}
+          ${{ inputs.vps_host }} ansible_user=${{ inputs.ssh_user }} ansible_port=${{ inputs.current_ssh_port }}
         options: |
-          --extra-vars SSH_ADMIN_IPS=${{ inputs.ssh_admin_ips }} SSH_PORT=${{ inputs.ssh_port }}
+          --extra-vars "SSH_ADMIN_IPS=${{ inputs.ssh_admin_ips }} SSH_PORT=${{ inputs.new_ssh_port }}"
 
     - name: Verify Docker installation
       run: |
-        ssh -i ~/.ssh/deploy_key ${{ inputs.ssh_user }}@${{ inputs.vps_host }} \
+        ssh -i ~/.ssh/deploy_key -p ${{ inputs.new_ssh_port }} ${{ inputs.ssh_user }}@${{ inputs.vps_host }} \
           "docker --version && docker compose version"
 
     - name: Clean up SSH key
