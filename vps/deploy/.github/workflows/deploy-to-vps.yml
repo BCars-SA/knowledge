@@ -1,0 +1,97 @@
+name: 2. Deploy to VPS (Hetzner)
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=raw,value=latest,enable={{is_default_branch}}
+          type=sha,prefix={{branch}}-
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        target: production
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+
+    - name: Deploy to Hetzner
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HETZNER_HOST }}
+        port: ${{ secrets.HETZNER_SSH_PORT || 22 }}
+        username: ${{ secrets.HETZNER_USER || 'admin' }}
+        key: ${{ secrets.HETZNER_SSH_KEY }}
+        script: |
+          set -euo pipefail
+
+          # Ensure deploy directory exists and switch into it
+          mkdir -p ~/app/${{ github.event.repository.name }}
+          cd ~/app/${{ github.event.repository.name }}
+
+          # Create environment file
+          cat > .env.production << EOF
+          API_KEY=${{ secrets.API_KEY }}
+          PORTFOLIO_API_KEY=${{ secrets.PORTFOLIO_API_KEY }}
+          LLM_EMBEDDINGS_API_KEY=${{ secrets.LLM_EMBEDDINGS_API_KEY }}
+          LLM_EXTRACTION_API_KEY=${{ secrets.LLM_EXTRACTION_API_KEY }}
+          LLM_SUMMARIZATION_API_KEY=${{ secrets.LLM_SUMMARIZATION_API_KEY }}
+          LLM_COMMON_API_KEY=${{ secrets.LLM_COMMON_API_KEY }}
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+          CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}
+          EOF
+          
+          # Download latest docker-compose file
+          curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+               -H "Accept: application/vnd.github.v3.raw" \
+               -o docker-compose.yml \
+               -L https://api.github.com/repos/${{ github.repository }}/contents/deploy/docker-compose-vps.yml
+          
+          # Download nginx configuration
+          curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+               -H "Accept: application/vnd.github.v3.raw" \
+               -o nginx.conf \
+               -L https://api.github.com/repos/${{ github.repository }}/contents/deploy/nginx.conf
+          
+          # Login and deploy
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker compose --env-file .env.production pull
+          docker compose --env-file .env.production up -d --wait
+          
+          # Show final status
+          echo "All services are healthy!"
+          docker compose --env-file .env.production ps
+          
+          # Cleanup
+          docker image prune -f
