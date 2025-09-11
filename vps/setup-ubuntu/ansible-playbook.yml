@@ -143,14 +143,21 @@
         backup: yes
       notify: restart fail2ban
 
-    - name: Add Docker GPG key
-      apt_key:
+    - name: Download Docker GPG key
+      get_url:
         url: https://download.docker.com/linux/ubuntu/gpg
-        state: present
+        dest: /usr/share/keyrings/docker-archive-keyring.gpg
+        mode: '0644'
+
+    - name: Convert Docker GPG key to dearmored format
+      command: >
+        gpg --dearmor -o /etc/apt/trusted.gpg.d/docker.gpg /usr/share/keyrings/docker-archive-keyring.gpg
+      args:
+        creates: /etc/apt/trusted.gpg.d/docker.gpg
 
     - name: Add Docker repository
       apt_repository:
-        repo: "deb https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        repo: "deb [arch=amd64 signed-by=/etc/apt/trusted.gpg.d/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
         state: present
 
     - name: Install Docker
