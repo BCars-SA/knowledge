@@ -19,7 +19,13 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 # 2. Determine the username
-USERNAME="${1:-$DEFAULT_USERNAME}"
+if [ -z "$1" ]; then
+  echo "👤 Enter username for the new sudo user (default: $DEFAULT_USERNAME):"
+  read -p "Username: " INPUT_USERNAME
+  USERNAME="${INPUT_USERNAME:-$DEFAULT_USERNAME}"
+else
+  USERNAME="$1"
+fi
 
 # 3. Check if the user already exists
 if id "$USERNAME" &>/dev/null; then

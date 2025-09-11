@@ -24,7 +24,12 @@ Run the provided script:
 curl -o create-sudo-user https://raw.githubusercontent.com/BCars-SA/knowledge/main/vps/setup-ubuntu/create-sudo-user.sh
 ./create-sudo-user.sh
 ```
-This creates an admin user and provides credentials.
+This creates a new user in sudoers group and provides credentials.
+You will be prompt for a user name.
+But you can also run it like this:
+```bash
+./create-sudo-user.sh myadminuser
+```
 
 ### Step 3: Login with New User
 ```bash
