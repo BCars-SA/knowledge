@@ -1,3 +1,4 @@
+---
 - name: Setup Ubuntu VPS for Docker deployments
   hosts: all
   become: yes
