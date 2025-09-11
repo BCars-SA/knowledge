@@ -118,12 +118,12 @@
       loop: "{{ allowed_ssh_ips }}"
       when: allowed_ssh_ips | length > 0
 
-    - name: Allow SSH from anywhere if no IPs specified (not recommended)
+    - name: Allow SSH from anywhere if no IPs specified
       ufw:
         rule: allow
         port: "{{ ssh_port }}"
         proto: tcp
-        comment: "SSH access (open - not recommended for production)"
+        comment: "SSH access (check conditional config for restrictions)"
       when: allowed_ssh_ips | length == 0
 
     - name: Allow HTTP and HTTPS
@@ -287,7 +287,7 @@
           - "VPS setup completed successfully!"
           - "Docker and Docker Compose installed"
           - "UFW firewall configured"
-          - "SSH access restricted to: {{ allowed_ssh_ips | join(', ') if allowed_ssh_ips else 'ALL IPs (not recommended)' }}"
+          - "SSH access restricted to: {{ allowed_ssh_ips | join(', ') if allowed_ssh_ips else 'ALL IPs (restrictions in conditions)' }}"
           - "Fail2ban configured for SSH protection"
           - "Automatic security updates enabled"
           - "Data directory: /opt/docker-data"
