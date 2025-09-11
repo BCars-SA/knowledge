@@ -7,6 +7,11 @@ on:
         description: 'VPS IP address or hostname'
         required: true
         type: string
+      ssh_port:
+        description: 'SSH port (default: 22)'
+        required: true
+        default: 22
+        type: number
       ssh_admin_ips:
         description: 'Comma-separated list of admin IPs for SSH access'
         required: true
@@ -54,7 +59,7 @@ jobs:
           [vps]
           ${{ inputs.vps_host }} ansible_user=${{ inputs.ssh_user }}
         options: |
-          --extra-vars SSH_ADMIN_IPS=${{ inputs.ssh_admin_ips }}
+          --extra-vars SSH_ADMIN_IPS=${{ inputs.ssh_admin_ips }} SSH_PORT=${{ inputs.ssh_port }}
 
     - name: Verify Docker installation
       run: |

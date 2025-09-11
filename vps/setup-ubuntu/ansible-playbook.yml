@@ -1,10 +1,9 @@
----
 - name: Setup Ubuntu VPS for Docker deployments
   hosts: all
   become: yes
   vars:
     allowed_ssh_ips: "{{ SSH_ADMIN_IPS | default('') | split(',') | map('trim') | reject('equalto', '') | list }}"
-    ssh_port: 22
+    ssh_port: {{ SSH_PORT | default(22) }}
     additional_volume_device: "{{ VOLUME_DEVICE | default('auto') }}"
     
   tasks:
@@ -277,17 +276,83 @@
               copytruncate
           }
 
+    # Disable/remove Ubuntu cloud/telemetry/background services
+    - name: Remove cloud-init
+      apt:
+        name: cloud-init
+        state: absent
+        purge: yes
+      ignore_errors: yes
+
+    - name: Remove snapd
+      apt:
+        name: snapd
+        state: absent
+        purge: yes
+      ignore_errors: yes
+
+    - name: Remove popularity-contest
+      apt:
+        name: popularity-contest
+        state: absent
+        purge: yes
+      ignore_errors: yes
+
+    - name: Remove canonical-livepatch
+      snap:
+        name: canonical-livepatch
+        state: absent
+      ignore_errors: yes
+
+    - name: Disable apport crash reporting
+      lineinfile:
+        path: /etc/default/apport
+        regexp: '^enabled='
+        line: 'enabled=0'
+      ignore_errors: yes
+
+    - name: Stop and disable apport service
+      systemd:
+        name: apport.service
+        enabled: no
+        state: stopped
+        masked: yes
+      ignore_errors: yes
+
+    - name: Stop and disable whoopsie
+      systemd:
+        name: whoopsie.service
+        enabled: no
+        state: stopped
+        masked: yes
+      ignore_errors: yes
+
+    - name: Disable motd-news
+      file:
+        path: /etc/update-motd.d/50-motd-news
+        mode: '0644'
+        state: absent
+      ignore_errors: yes
+
+    - name: Disable Ubuntu Pro/Advantage apt news
+      command: pro config set apt_news=false
+      args:
+        warn: false
+      ignore_errors: yes
+
     - name: Show setup summary
       debug:
         msg:
           - "VPS setup completed successfully!"
           - "Docker and Docker Compose installed"
           - "UFW firewall configured"
+          - "SSH port: {{ ssh_port }}"
           - "SSH access restricted to: {{ allowed_ssh_ips | join(', ') if allowed_ssh_ips else 'ALL IPs (restrictions in conditions)' }}"
           - "Fail2ban configured for SSH protection"
           - "Automatic security updates enabled"
           - "Data directory: /opt/docker-data"
           - "Additional volume: {{ '/mnt/data mounted from ' + target_device if device_exists else '/mnt/data created as regular directory (no additional block device found)' }}"
+          - "Cloud/telemetry services removed/disabled where applicable"
 
   handlers:
     - name: restart ssh

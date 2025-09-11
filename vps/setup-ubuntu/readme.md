@@ -65,6 +65,7 @@ This generates SSH keys for GitHub Actions.
 ### 🛡️ Security
 - UFW firewall with restrictive rules
 - SSH hardening with conditional password authentication
+- SSH custom port
 - Fail2ban for SSH brute force protection
 - Automatic security updates
 - Non-root user setup
@@ -82,12 +83,26 @@ This generates SSH keys for GitHub Actions.
 - Data directory creation (/opt/docker-data)
 - Additional volume setup (/mnt/data) for container persistent storage
 
+### ☁️ Cloud/telemetry services removed/disabled
+
+The following background or telemetry-related services are removed or disabled by the playbook:
+
+- `cloud-init` (cloud VM initialization)
+- `snapd` (Snap package manager)
+- `popularity-contest` (package usage reporting)
+- `canonical-livepatch` (kernel patching telemetry)
+- `apport` (crash reporting)
+- `whoopsie` (crash report submission)
+- `motd-news` (login news/messages)
+- Ubuntu Pro/Advantage APT news (cloud notifications)
+
 ## ⚙️ GitHub Action Parameters
 
 When running the workflow, provide:
-- **VPS Host**: Your server IP address
-- **SSH Admin IPs**: Comma-separated admin IPs (e.g., `203.0.113.42,198.51.100.0/24`)
-- **SSH User**: `admin` (from create-sudo-user.sh script)
+- **VPS Host**: Your server IP address.
+- **SSH Port**: Your SSH port, default is 22, but it's better to use a custom one.
+- **SSH Admin IPs**: Comma-separated admin IPs (e.g., `203.0.113.42,198.51.100.0/24`).
+- **SSH User**: `admin` (from create-sudo-user.sh script).
 
 ## 🔑 SSH Access Configuration
 
@@ -105,6 +120,7 @@ The playbook configures **conditional SSH authentication**:
 
 - Always use specific IP ranges instead of allowing global access
 - Keep your SSH private keys secure
+- Use different from default SSH port 22 for "security through obscurity"
 - Regularly update the allowed IP list
 - Monitor fail2ban logs for suspicious activity
 
