@@ -23,16 +23,16 @@ Run the provided script:
 ```bash
 curl -o create-sudo-user.sh https://raw.githubusercontent.com/BCars-SA/knowledge/main/vps/setup-ubuntu/create-sudo-user.sh
 ```
-And then run the script:
+And then run the script (you will be prompt for a user name, default is **admin**"**):
 ```
 bash ./create-sudo-user.sh
 ```
-This creates a new user in sudoers group and provides credentials.
-You will be prompt for a user name.
-But you can also run it like this:
+OR
 ```bash
 bash ./create-sudo-user.sh myadminuser
 ```
+This creates a new user in sudoers group and provides credentials.
+Copy the new user's password.
 
 ### Step 3️⃣: 🔄 Logout and Login with New User
 ```bash
@@ -41,10 +41,10 @@ logout
 ```bash
 ssh admin@your-vps-ip
 ```
-Use the password copied from **Step 2**.
+Use the user name (replace **admin** if other used) and the password copied from **Step 2**.
 
-### Step 4️⃣: 🔑 Create SSH Keys
-Run the provided script (normally download automatically in the **Step 2**):
+### Step 4️⃣: 🔑 Create SSH Keys (under the new user)
+Run the provided script (normally downloaded automatically in the **Step 2**):
 ```bash
 bash ./create-ssh-keys.sh
 ```
