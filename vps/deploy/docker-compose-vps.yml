@@ -8,8 +8,6 @@ services:
     image: ghcr.io/YOUR_PATH_TO_IMAGE:latest
     container_name: my-super-service-api
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     environment:
       # EXAMPLE OF ENV VARIABLES - REPLACE WITH YOUR ACTUAL CONFIGURATION
       # THIS ONE IS FOR AN API SERVICE + POSTGRES + REDIS SETUP
@@ -83,8 +81,6 @@ services:
       POSTGRES_EFFECTIVE_CACHE_SIZE: 256MB
       POSTGRES_WORK_MEM: 4MB
       POSTGRES_MAINTENANCE_WORK_MEM: 64MB
-    ports:
-      - "${POSTGRES_EXTERNAL_PORT:-5432}:5432"
     volumes:
       - /mnt/data/postgres:/var/lib/postgresql/data
     healthcheck:
@@ -126,8 +122,6 @@ services:
       --save 600 1 300 10 60 10000
       --tcp-keepalive 60
       --timeout 300
-    ports:
-      - "${REDIS_EXTERNAL_PORT:-6379}:6379"
     volumes:
       - /mnt/data/redis:/data
     healthcheck:

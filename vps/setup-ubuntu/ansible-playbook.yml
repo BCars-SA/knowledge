@@ -3,14 +3,19 @@
   hosts: all
   become: yes
   vars:
-    allowed_ssh_ips: "{{ SSH_ADMIN_IPS | default('') | split(',') | map('trim') | reject('equalto', '') | list }}"
+    allowed_ssh_admin_ips: "{{ ALLOWED_SSH_ADMIN_IPS | default('') | split(',') | map('trim') | reject('equalto', '') | list }}"
+    allowed_http_ips: "{{ ALLOWED_HTTP_IPS | default('') | split(',') | map('trim') | reject('equalto', '') | list }}"
     ssh_port: "{{ SSH_PORT | default(22) }}"
     additional_volume_device: "{{ VOLUME_DEVICE | default('auto') }}"
     
   tasks:
-    - name: The list of allowed ssh ips passed
+    - name: The list of allowed SSH admin ips passed
       debug:
-        var: allowed_ssh_ips
+        var: allowed_ssh_admin_ips
+
+    - name: The list of allowed HTTP ips passed
+      debug:
+        var: allowed_http_ips
 
     # Gather package and service facts for conditional removals
     - name: Gather installed package facts
@@ -100,7 +105,7 @@
         dest: /etc/ssh/sshd_config.d/conditional_access.conf
         content: |
           # Allow password auth only from specific IPs
-          {% for ip in allowed_ssh_ips %}
+          {% for ip in allowed_ssh_admin_ips %}
           {% if ip %}
           Match Address {{ ip }}
               PermitRootLogin yes
@@ -110,10 +115,10 @@
           {% endfor %}
           
           # Default: key-only authentication for all other IPs
-          Match Address *,!{{ allowed_ssh_ips | join(',!') if allowed_ssh_ips else '0.0.0.0/0' }}
+          Match Address *,!{{ allowed_ssh_admin_ips | join(',!') if allowed_ssh_admin_ips else '0.0.0.0/0' }}
               PasswordAuthentication no
               PubkeyAuthentication yes
-      when: allowed_ssh_ips | length > 0
+      when: allowed_ssh_admin_ips | length > 0
       notify: restart ssh
 
     - name: Set up UFW firewall defaults
@@ -131,14 +136,26 @@
         proto: tcp
         comment: "SSH access (see SSH config for restrictions)"
 
-    - name: Allow HTTP and HTTPS
+    - name: Allow HTTP and HTTPS from specific IPs
+      ufw:
+        rule: allow
+        port: "{{ item.0 }}"
+        proto: tcp
+        src: "{{ item.1 }}"
+        comment: "HTTP/HTTPS access from {{ item.1 }}"
+      loop: "{{ ['80', '443'] | product(allowed_http_ips) | list }}"
+      when: allowed_http_ips | length > 0
+
+    - name: Allow HTTP and HTTPS from all IPs (when no restrictions)
       ufw:
         rule: allow
         port: "{{ item }}"
         proto: tcp
+        comment: "HTTP/HTTPS access (unrestricted)"
       loop:
         - "80"
         - "443"
+      when: allowed_http_ips | length == 0
 
     - name: Enable UFW
       ufw:
@@ -387,7 +404,8 @@
           - "Docker and Docker Compose installed"
           - "UFW firewall configured"
           - "SSH port: {{ ssh_port }}"
-          - "SSH access restricted to: {{ allowed_ssh_ips | join(', ') if allowed_ssh_ips else 'ALL IPs (restrictions in conditions)' }}"
+          - "SSH login/password access restricted to: {{ allowed_ssh_admin_ips | join(', ') if allowed_ssh_admin_ips else 'ALL IPs (restrictions in conditions)' }}"
+          - "HTTP/HTTPS access restricted to: {{ allowed_http_ips | join(', ') if allowed_http_ips else 'ALL IPs (unrestricted)' }}"
           - "Fail2ban configured for SSH protection"
           - "Automatic security updates enabled"
           - "Data directory: /opt/docker-data"

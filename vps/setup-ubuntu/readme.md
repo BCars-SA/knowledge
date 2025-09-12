@@ -102,6 +102,7 @@ When running the workflow, provide:
 - **VPS Host**: Your server IP address.
 - **New SSH Port**: Your new SSH port, default is 22, but it's better to use a custom one.
 - **Current SSH Port**: Current VPS SSH port (normally 22).
+- **HTTP IPs**: Comma-separated IPs for authorized HTTP(S) access (80 and 443 port).
 - **SSH Admin IPs**: Comma-separated admin IPs (e.g., `203.0.113.42,198.51.100.0/24`).
 - **SSH User**: `admin` (from create-sudo-user.sh script).
 
@@ -115,11 +116,13 @@ The playbook configures **conditional SSH authentication**:
 
 ## 🌐 Environment Variables
 
-- `SSH_ADMIN_IPS`: Comma-separated list of IP addresses/CIDR blocks for SSH password access
+- `ALLOWED_SSH_ADMIN_IPS`: Comma-separated list of IP addresses/CIDR blocks for SSH password access
+- `SSH_PORT`: Custom SSH port if you want to change the default 22
+- `ALLOWED_HTTP_IPS`: Comma-separated list of IP addresses/CIDR blocks for authorized IPs for HTTP(S) incoming traffic
 
 ## 🔒 Security Notes
 
-- Always use specific IP ranges instead of allowing global access
+- Always use specific IP ranges instead of allowing global access (for SSH and HTTP(S))
 - Keep your SSH private keys secure
 - Use different from default SSH port 22 for "security through obscurity"
 - Regularly update the allowed IP list
@@ -137,3 +140,4 @@ After running the playbook:
    - Check `/opt/docker-data` directory exists
    - If `/dev/sdb` was available: `df -h | grep /mnt/data` to verify mounting
    - Test volume permissions for Docker containers
+6. **Setup VPS provider firewall**: Duplicate your VPS firewall rules on higher level: VPS provider Firewall (if available)

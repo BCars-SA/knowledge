@@ -1,4 +1,4 @@
-name: Setup Ubuntu VPS with Ansible
+name: 1. Setup Ubuntu VPS with Ansible (run it once)
 
 on:
   workflow_dispatch:
@@ -16,8 +16,12 @@ on:
         required: true
         default: 22
         type: number
-      ssh_admin_ips:
-        description: 'Comma-separated list of admin IPs for SSH access'
+      allowed_ssh_admin_ips:
+        description: 'Comma-separated list of admin (login with password) IPs for SSH access'
+        required: true
+        type: string
+      allowed_http_ips:
+        description: 'Comma-separated list of IPs for HTTP access'
         required: true
         type: string
       ssh_user:
@@ -63,7 +67,7 @@ jobs:
           [vps]
           ${{ inputs.vps_host }} ansible_user=${{ inputs.ssh_user }} ansible_port=${{ inputs.current_ssh_port }}
         options: |
-          --extra-vars "SSH_ADMIN_IPS=${{ inputs.ssh_admin_ips }} SSH_PORT=${{ inputs.new_ssh_port }}"
+          --extra-vars "ALLOWED_HTTP_IPS=${{ inputs.allowed_http_ips }} ALLOWED_SSH_ADMIN_IPS=${{ inputs.allowed_ssh_admin_ips }} SSH_PORT=${{ inputs.new_ssh_port }}"
 
     - name: Verify Docker installation
       run: |
