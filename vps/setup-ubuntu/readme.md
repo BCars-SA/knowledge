@@ -63,7 +63,10 @@ This generates SSH keys for GitHub Actions.
 ## 🚀 Features
 
 ### 🛡️ Security
-- UFW firewall with restrictive rules
+- UFW firewall with restrictive rules:
+   - IPv6 disabled
+   - Conditional SSH access (login/password from whitelisted IPs, otherwise SSH key only)
+   - HTTP(S) access from whitelisted IPs (for your Nginx Gateway Server f.e.)
 - SSH hardening with conditional password authentication
 - SSH custom port
 - Fail2ban for SSH brute force protection
@@ -127,6 +130,12 @@ The playbook configures **conditional SSH authentication**:
 - Use different from default SSH port 22 for "security through obscurity"
 - Regularly update the allowed IP list
 - Monitor fail2ban logs for suspicious activity
+
+## Idempotent Behavior of the Playbook
+You can run `setup-vps-ansible` GitHub Action multiple times in order to change SSH and UFW settings for example:
+- It resets UFW to the defaults on every run and applies the rules again
+- It removes conditional SSH config and creates it again
+- Other steps are idempotent also
 
 ## ✅ Post-Setup
 

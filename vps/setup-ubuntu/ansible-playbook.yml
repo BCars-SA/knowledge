@@ -100,6 +100,12 @@
         backup: yes
       notify: restart ssh
 
+    - name: Remove existing SSH conditional access configuration
+      file:
+        path: /etc/ssh/sshd_config.d/conditional_access.conf
+        state: absent
+      when: allowed_ssh_admin_ips | length > 0
+
     - name: Create SSH conditional access configuration
       copy:
         dest: /etc/ssh/sshd_config.d/conditional_access.conf
@@ -121,6 +127,10 @@
       when: allowed_ssh_admin_ips | length > 0
       notify: restart ssh
 
+    - name: Reset UFW to defaults (remove all custom rules)
+      ufw:
+        state: reset
+      
     - name: Set up UFW firewall defaults
       ufw:
         direction: "{{ item.direction }}"
@@ -129,12 +139,19 @@
         - { direction: 'incoming', policy: 'deny' }
         - { direction: 'outgoing', policy: 'allow' }
 
-    - name: Allow SSH (always, restrictions in SSH config)
+    - name: Disable IPv6 in UFW
+      lineinfile:
+        path: /etc/default/ufw
+        regexp: '^IPV6='
+        line: 'IPV6=no'
+        backup: yes
+
+    - name: Allow SSH (IPv4 only, restrictions in SSH config)
       ufw:
         rule: allow
         port: "{{ ssh_port }}"
         proto: tcp
-        comment: "SSH access (see SSH config for restrictions)"
+        comment: "SSH access IPv4 only (see SSH config for restrictions)"
 
     - name: Allow HTTP and HTTPS from specific IPs
       ufw:
@@ -176,22 +193,36 @@
         backup: yes
       notify: restart fail2ban
 
+    - name: Check if Docker GPG key already exists
+      stat:
+        path: /etc/apt/trusted.gpg.d/docker.gpg
+      register: docker_gpg_key
+
     - name: Download Docker GPG key
       get_url:
         url: https://download.docker.com/linux/ubuntu/gpg
         dest: /usr/share/keyrings/docker-archive-keyring.gpg
         mode: '0644'
+        force: no
+      when: not docker_gpg_key.stat.exists
 
     - name: Convert Docker GPG key to dearmored format
       command: >
         gpg --dearmor -o /etc/apt/trusted.gpg.d/docker.gpg /usr/share/keyrings/docker-archive-keyring.gpg
-      args:
-        creates: /etc/apt/trusted.gpg.d/docker.gpg
+      when: not docker_gpg_key.stat.exists
 
-    - name: Add Docker repository
+    - name: Remove temporary Docker GPG key file
+      file:
+        path: /usr/share/keyrings/docker-archive-keyring.gpg
+        state: absent
+      when: not docker_gpg_key.stat.exists
+
+    - name: Add Docker repository (idempotent)
       apt_repository:
         repo: "deb [arch=amd64 signed-by=/etc/apt/trusted.gpg.d/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
         state: present
+        filename: docker
+        update_cache: yes
 
     - name: Install Docker
       apt:
