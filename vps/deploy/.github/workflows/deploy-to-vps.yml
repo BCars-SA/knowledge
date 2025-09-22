@@ -62,10 +62,6 @@ jobs:
           # Create environment file
           cat > .env.production << EOF
           API_KEY=${{ secrets.API_KEY }}
-          PORTFOLIO_API_KEY=${{ secrets.PORTFOLIO_API_KEY }}
-          LLM_EMBEDDINGS_API_KEY=${{ secrets.LLM_EMBEDDINGS_API_KEY }}
-          LLM_EXTRACTION_API_KEY=${{ secrets.LLM_EXTRACTION_API_KEY }}
-          LLM_SUMMARIZATION_API_KEY=${{ secrets.LLM_SUMMARIZATION_API_KEY }}
           LLM_COMMON_API_KEY=${{ secrets.LLM_COMMON_API_KEY }}
           POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
           REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
