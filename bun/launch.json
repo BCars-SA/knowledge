@@ -1,0 +1,34 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        // Configuration for your HTTP server
+        {
+            "type": "bun",
+            "request": "launch",
+            "name": "Bun: HTTP Server",
+            "program": "${workspaceFolder}/src/http-server.ts",
+            "watchMode": true,
+            "runtimeArgs": ["--inspect=9229"],
+            "postDebugTask": "kill-bun-processes"
+        },
+
+        // Configuration for your WebSocket server
+        {
+            "type": "bun",
+            "request": "launch",
+            "name": "Bun: WS Server",
+            "program": "${workspaceFolder}/src/ws-server.ts",
+            "watchMode": true,
+            "runtimeArgs": ["--inspect=9230"],
+            "postDebugTask": "kill-bun-processes"
+        }
+    ],
+    "compounds": [
+        // This group will launch both configurations above at the same time
+        {
+            "name": "🚀 Bun: Run All",
+            "configurations": ["Bun: HTTP Server", "Bun: WS Server"],
+            "stopAll": true
+        }
+    ]
+}
