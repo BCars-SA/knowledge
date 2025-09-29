@@ -239,22 +239,24 @@
         mode: '0755'
       when: not device_exists
 
+    - name: Configure Docker daemon for log rotation
+      copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "log-driver": "json-file",
+            "log-opts": {
+              "max-size": "20m",
+              "max-file": "5"
+            }
+          }
+      notify: restart docker
+
+    # ------------------------------------------------------
+    # Timezone configuration
     - name: Set timezone to UTC
       timezone:
         name: UTC
-
-    - name: Configure logrotate for Docker
-      copy:
-        dest: /etc/logrotate.d/docker
-        content: |
-          /var/lib/docker/containers/*/*.log {
-              rotate 7
-              daily
-              compress
-              missingok
-              delaycompress
-              copytruncate
-          }
 
     # ------------------------------------------------------
     # SSH and UFW configuration
@@ -499,4 +501,9 @@
     - name: restart fail2ban
       systemd:
         name: fail2ban
+        state: restarted
+
+    - name: restart docker
+      systemd:
+        name: docker
         state: restarted
