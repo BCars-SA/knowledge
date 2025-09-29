@@ -17,6 +17,20 @@
       debug:
         var: allowed_http_ips
 
+    # --------------------------------
+    # Pre-flight checks
+    - name: Test DNS resolution
+      shell: nslookup download.docker.com
+      register: dns_test
+      failed_when: false
+      changed_when: false
+      
+    - name: Warn about DNS issues
+      debug:
+        msg: "WARNING: DNS resolution failed. This might cause package installation issues."
+      when: dns_test.rc != 0
+
+    # --------------------------------
     # Gather package and service facts for conditional removals
     - name: Gather installed package facts
       package_facts:
@@ -25,6 +39,8 @@
     - name: Gather service facts
       service_facts:
 
+    # --------------------------------
+    # Basic system updates and essential package installations
     - name: Update apt cache
       apt:
         update_cache: yes
@@ -68,6 +84,180 @@
           APT::Periodic::AutocleanInterval "7";
           APT::Periodic::Unattended-Upgrade "1";
 
+    # --------------------------------
+    # Docker installation and configuration, volume setup
+    - name: Check if Docker GPG key already exists
+      stat:
+        path: /etc/apt/trusted.gpg.d/docker.gpg
+      register: docker_gpg_key
+
+    - name: Download Docker GPG key
+      get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /usr/share/keyrings/docker-archive-keyring.gpg
+        mode: '0644'
+        force: no
+      retries: 3
+      delay: 5
+      when: not docker_gpg_key.stat.exists
+
+    - name: Convert Docker GPG key to dearmored format
+      command: >
+        gpg --dearmor -o /etc/apt/trusted.gpg.d/docker.gpg /usr/share/keyrings/docker-archive-keyring.gpg
+      when: not docker_gpg_key.stat.exists
+
+    - name: Remove temporary Docker GPG key file
+      file:
+        path: /usr/share/keyrings/docker-archive-keyring.gpg
+        state: absent
+      when: not docker_gpg_key.stat.exists
+
+    - name: Detect system architecture
+      set_fact:
+        docker_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' if ansible_architecture == 'aarch64' else ansible_architecture }}"
+
+    - name: Add Docker repository (architecture-aware)
+      apt_repository:
+        repo: "deb [arch={{ docker_arch }} signed-by=/etc/apt/trusted.gpg.d/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+        filename: docker
+        update_cache: yes
+
+    - name: Install Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+
+    - name: Add users to docker group
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+
+    - name: Enable and start Docker service
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+
+    - name: Verify Docker installation
+      command: docker --version
+      register: docker_version_check
+      until: docker_version_check.rc == 0
+
+    - name: Set Docker Compose architecture
+      set_fact:
+        compose_arch: "{{ 'x86_64' if ansible_architecture == 'x86_64' else 'aarch64' if ansible_architecture == 'aarch64' else ansible_architecture }}"
+
+    - name: Install Docker Compose (standalone, architecture-aware)
+      get_url:
+        url: "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-{{ compose_arch }}"
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
+      retries: 3
+      delay: 5
+
+    - name: Verify Docker Compose installation
+      command: docker-compose --version
+      register: compose_version_check
+      until: compose_version_check.rc == 0
+
+    - name: Create data directory
+      file:
+        path: /opt/docker-data
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: docker
+        mode: '0755'
+
+    - name: Find available block devices
+      shell: |
+        for dev in /dev/sd[b-z]; do
+          if [ -b "$dev" ] && ! grep -q "$dev" /proc/mounts; then
+            echo "$dev"
+            break
+          fi
+        done
+      register: available_device
+      changed_when: false
+      failed_when: false
+
+    - name: Set device variable
+      set_fact:
+        target_device: "{{ available_device.stdout.strip() }}"
+        device_exists: "{{ available_device.stdout.strip() | length > 0 }}"
+
+    - name: Create mount point for additional volume
+      file:
+        path: /mnt/data
+        state: directory
+        mode: '0755'
+      when: device_exists
+
+    - name: Mount additional device to /mnt/data
+      mount:
+        path: /mnt/data
+        src: "{{ target_device }}"
+        fstype: ext4
+        opts: defaults
+        state: mounted
+      when: device_exists
+      ignore_errors: yes
+
+    - name: Add device to fstab for persistent mounting
+      mount:
+        path: /mnt/data
+        src: "{{ target_device }}"
+        fstype: ext4
+        opts: defaults
+        state: present
+      when: device_exists
+      ignore_errors: yes
+
+    - name: Set ownership of mounted volume
+      file:
+        path: /mnt/data
+        owner: "{{ ansible_user }}"
+        group: docker
+        mode: '0755'
+        recurse: no
+      when: device_exists
+      ignore_errors: yes
+
+    - name: Create fallback data directory when no additional volume
+      file:
+        path: /mnt/data
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: docker
+        mode: '0755'
+      when: not device_exists
+
+    - name: Set timezone to UTC
+      timezone:
+        name: UTC
+
+    - name: Configure logrotate for Docker
+      copy:
+        dest: /etc/logrotate.d/docker
+        content: |
+          /var/lib/docker/containers/*/*.log {
+              rotate 7
+              daily
+              compress
+              missingok
+              delaycompress
+              copytruncate
+          }
+
+    # ------------------------------------------------------
+    # SSH and UFW configuration
     - name: Configure SSH port
       lineinfile:
         path: /etc/ssh/sshd_config
@@ -192,155 +382,8 @@
           findtime = 600
         backup: yes
       notify: restart fail2ban
-
-    - name: Check if Docker GPG key already exists
-      stat:
-        path: /etc/apt/trusted.gpg.d/docker.gpg
-      register: docker_gpg_key
-
-    - name: Download Docker GPG key
-      get_url:
-        url: https://download.docker.com/linux/ubuntu/gpg
-        dest: /usr/share/keyrings/docker-archive-keyring.gpg
-        mode: '0644'
-        force: no
-      when: not docker_gpg_key.stat.exists
-
-    - name: Convert Docker GPG key to dearmored format
-      command: >
-        gpg --dearmor -o /etc/apt/trusted.gpg.d/docker.gpg /usr/share/keyrings/docker-archive-keyring.gpg
-      when: not docker_gpg_key.stat.exists
-
-    - name: Remove temporary Docker GPG key file
-      file:
-        path: /usr/share/keyrings/docker-archive-keyring.gpg
-        state: absent
-      when: not docker_gpg_key.stat.exists
-
-    - name: Add Docker repository (idempotent)
-      apt_repository:
-        repo: "deb [arch=amd64 signed-by=/etc/apt/trusted.gpg.d/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
-        state: present
-        filename: docker
-        update_cache: yes
-
-    - name: Install Docker
-      apt:
-        name:
-          - docker-ce
-          - docker-ce-cli
-          - containerd.io
-          - docker-buildx-plugin
-          - docker-compose-plugin
-        state: present
-        update_cache: yes
-
-    - name: Add users to docker group
-      user:
-        name: "{{ ansible_user }}"
-        groups: docker
-        append: yes
-
-    - name: Enable and start Docker service
-      systemd:
-        name: docker
-        enabled: yes
-        state: started
-
-    - name: Install Docker Compose (standalone)
-      get_url:
-        url: "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64"
-        dest: /usr/local/bin/docker-compose
-        mode: '0755'
-
-    - name: Create data directory
-      file:
-        path: /opt/docker-data
-        state: directory
-        owner: "{{ ansible_user }}"
-        group: docker
-        mode: '0755'
-
-    - name: Find available block devices
-      shell: |
-        for dev in /dev/sd[b-z]; do
-          if [ -b "$dev" ] && ! grep -q "$dev" /proc/mounts; then
-            echo "$dev"
-            break
-          fi
-        done
-      register: available_device
-      changed_when: false
-      failed_when: false
-
-    - name: Set device variable
-      set_fact:
-        target_device: "{{ available_device.stdout.strip() }}"
-        device_exists: "{{ available_device.stdout.strip() | length > 0 }}"
-
-    - name: Create mount point for additional volume
-      file:
-        path: /mnt/data
-        state: directory
-        mode: '0755'
-      when: device_exists
-
-    - name: Mount additional device to /mnt/data
-      mount:
-        path: /mnt/data
-        src: "{{ target_device }}"
-        fstype: ext4
-        opts: defaults
-        state: mounted
-      when: device_exists
-      ignore_errors: yes
-
-    - name: Add device to fstab for persistent mounting
-      mount:
-        path: /mnt/data
-        src: "{{ target_device }}"
-        fstype: ext4
-        opts: defaults
-        state: present
-      when: device_exists
-      ignore_errors: yes
-
-    - name: Set ownership of mounted volume
-      file:
-        path: /mnt/data
-        owner: "{{ ansible_user }}"
-        group: docker
-        mode: '0755'
-        recurse: no
-      when: device_exists
-      ignore_errors: yes
-
-    - name: Create fallback data directory when no additional volume
-      file:
-        path: /mnt/data
-        state: directory
-        owner: "{{ ansible_user }}"
-        group: docker
-        mode: '0755'
-      when: not device_exists
-
-    - name: Set timezone to UTC
-      timezone:
-        name: UTC
-
-    - name: Configure logrotate for Docker
-      copy:
-        dest: /etc/logrotate.d/docker
-        content: |
-          /var/lib/docker/containers/*/*.log {
-              rotate 7
-              daily
-              compress
-              missingok
-              delaycompress
-              copytruncate
-          }
-
+   
+    # ------------------------------------------------------
     # Disable/remove Ubuntu cloud/telemetry/background services
     - name: Remove cloud-init
       apt:
@@ -428,10 +471,14 @@
       when: ansible_facts['distribution'] == 'Ubuntu'
       ignore_errors: yes
 
+
+    # ------------------------------------------------------
+    # Final summary
     - name: Show setup summary
       debug:
         msg:
           - "VPS setup completed successfully!"
+          - "System architecture: {{ ansible_architecture }} (Docker: {{ docker_arch }}, Compose: {{ compose_arch }})"
           - "Docker and Docker Compose installed"
           - "UFW firewall configured"
           - "SSH port: {{ ssh_port }}"
