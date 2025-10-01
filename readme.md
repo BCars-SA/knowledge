@@ -6,7 +6,7 @@ Below are the main topics covered:
 
 ## AI
 - [How to Choose the Right LLM Model](AI/how-to-choose-model.md)
-- [Prompt Engineering Best Practices](AI/prompt-engineering.md)
+- [Prompt Engineering Best Practices](AI/how-to-write-prompts.md)
 - [AI Resources and Platforms](AI/readme.md)
 
 ## Node.js
@@ -15,7 +15,7 @@ Below are the main topics covered:
 
 ## Setup VPS
 - [VPS Setup Guide](vps/setup-ubuntu/readme.md)
-- [Deploy to VPS with Docker Compose and GitHub Actions](vps/deploy/readme.md)
+- [Example of Deploying to VPS with Docker Compose and GitHub Actions](vps/deploy/readme.md)
 
 ## .NET
 - [Coding Guidelines](.net/readme.md)

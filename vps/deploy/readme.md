@@ -1,4 +1,4 @@
-# VPS Deployment Configuration
+# VPS Deployment Example
 
 This directory contains a complete Docker-based deployment setup for a Node.js/Bun API service with PostgreSQL, Redis, and Nginx reverse proxy, designed for VPS deployment via GitHub Actions.
 
