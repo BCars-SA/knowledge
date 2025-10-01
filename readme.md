@@ -4,6 +4,19 @@ This repository contains guidelines and best practices for various aspects of so
 Some recommendations are specific to Bcars SA projects, but most are general best practices applicable to any project.
 Below are the main topics covered:
 
+## AI
+- [How to Choose the Right LLM Model](AI/how-to-choose-model.md)
+- [Prompt Engineering Best Practices](AI/prompt-engineering.md)
+- [AI Resources and Platforms](AI/readme.md)
+
+## Node.js
+### Bun / Biome / Express.js boilerplate
+- [Bun + Biome + Express.js Boilerplate](nodejs/boilerplates/service-bun-express/)
+
+## Setup VPS
+- [VPS Setup Guide](vps/setup-ubuntu/readme.md)
+- [Deploy to VPS with Docker Compose and GitHub Actions](vps/deploy/readme.md)
+
 ## .NET
 - [Coding Guidelines](.net/readme.md)
 - [Naming Conventions](.net/naming.md)
