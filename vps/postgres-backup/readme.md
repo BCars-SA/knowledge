@@ -162,8 +162,8 @@ set -euo pipefail  # Exit on error, undefined variables, pipe failures
 BACKUP_DIR="/srv/backups"
 LOG_DIR="/var/log/postgres-backups"
 CONTAINER_NAME="threecx-api-postgres"
-DB_USER="postgres"
-DB_NAME="postgres"
+DB_USER="DB_USER"
+DB_NAME="DB_NAME"
 
 CURRENT="$BACKUP_DIR/postgres_current.dump.xz"
 PREVIOUS="$BACKUP_DIR/postgres_previous.dump.xz"
@@ -218,7 +218,7 @@ echo "$(date '+%F %T') - Backup process completed successfully" >> "$LOG_FILE"
 arc_file_size=$(stat -c "%s" "$CURRENT")  # Compressed file size in bytes
 
 # zabbix sender
-zbx_server="62.2.99.250"
+zbx_server="XX.X.XX.XXX"
 zbx_port="10051"
 zbx_hostname="3CX API"
 zbx_key="PG_DB_backup_size"
