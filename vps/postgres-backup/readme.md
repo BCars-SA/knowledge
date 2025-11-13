@@ -16,7 +16,7 @@ This setup provides:
 ```
 ┌─────────────────────────┐
 │   Hetzner Server        │
-│  ┌──────────────────┐   │     SSH + rsync      ┌──────────────────┐
+│  ┌──────────────────┐   │     SSH + rsync       ┌──────────────────┐
 │  │ Docker Container │   │ ─────────────────────>│  Synology NAS    │
 │  │   PostgreSQL     │   │                       │                  │
 │  └──────────────────┘   │                       │ /volume1/        │
