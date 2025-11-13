@@ -211,6 +211,25 @@ else
 fi
 
 echo "$(date '+%F %T') - Backup process completed successfully" >> "$LOG_FILE"
+
+#Send file size to zabbix
+
+# Use the stat command to obtain file information and store it in variables
+arc_file_size=$(stat -c "%s" "$CURRENT")  # Compressed file size in bytes
+
+# zabbix sender
+zbx_server="62.2.99.250"
+zbx_port="10051"
+zbx_hostname="3CX API"
+zbx_key="PG_DB_backup_size"
+zbx_value=$arc_file_size
+zbx_DATA='{"request":"sender data","data":[{"host":"'${zbx_hostname}'","key":"'${zbx_key}'","value":"'${zbx_value}'"}]}'
+printf -v LENGTH '%016x' "${#zbx_DATA}"
+PACK=""
+for (( i=14; i>=0; i-=2 )); do PACK="$PACK\\x${LENGTH:$i:2}"; done
+
+#zabbix send
+printf "ZBXD\1$PACK%s" "$zbx_DATA" > /dev/tcp/${zbx_server}/${zbx_port}
 ```
 
 **Make the script executable:**
