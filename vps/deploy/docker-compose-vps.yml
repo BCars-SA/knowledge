@@ -125,7 +125,7 @@ services:
     volumes:
       - /mnt/data/redis:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -151,6 +151,11 @@ services:
     depends_on:
       my-super-service:
         condition: service_healthy
+    # Increase file descriptor limits for high concurrency
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/my-super-service/api/health"]
       interval: 10s
@@ -162,11 +167,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: 64M
-          cpus: '0.1'
+          memory: 512M
+          cpus: '1.0'
         reservations:
-          memory: 32M
-          cpus: '0.05'
+          memory: 256M
+          cpus: '0.5'
 
 networks:
   my-super-service-network:

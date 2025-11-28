@@ -97,7 +97,7 @@ Optimized for small VPS instances:
 API Service:  512M-1G RAM, 0.25-0.5 CPU
 PostgreSQL:   1G-2G RAM, 0.5-1.0 CPU  
 Redis:        128M-256M RAM
-Nginx:        32M-64M RAM, 0.05-0.1 CPU
+Nginx:        128M-512M RAM, 0.5-1.0 CPU
 ```
 
 ### Volume Mounts
