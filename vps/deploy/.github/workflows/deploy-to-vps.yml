@@ -67,6 +67,9 @@ jobs:
           REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
           CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}
           EOF
+
+          # Set proper permissions for .env.production file
+          chmod 600 .env.production
           
           # Download latest docker-compose file
           curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \

@@ -77,6 +77,12 @@ jobs:
           mkdir -p ~/app/${{ github.event.repository.name }}
           cd ~/app/${{ github.event.repository.name }}
 
+          # Aggressively remove config items if they exist to prevent "Is a directory" errors
+          # This fixes the issue if a reboot has already created bad directories
+          sudo rm -rf dozzle-users.yml
+          sudo rm -rf google-application-credentials.json
+          sudo rm -rf .env
+
           # Rename docker-compose file to expected name
           mv docker-compose-vps.yml docker-compose.yml
           
@@ -84,6 +90,9 @@ jobs:
           cat > dozzle-users.yml << 'EOF'
           ${{ secrets.DOZZLE_USERS_YML }}
           EOF
+
+          # Set proper permissions for the dozzle users file
+          chmod 600 dozzle-users.yml
 
           # Create GOOGLE_APPLICATION_CREDENTIALS.json file from GitHub secret
           cat > google-application-credentials.json << 'EOF'
@@ -114,6 +123,9 @@ jobs:
           ./safe-replace-of-env-var.sh REDIS_PASSWORD "$REDIS_PASSWORD" .env
           ./safe-replace-of-env-var.sh CORS_ORIGIN "$CORS_ORIGIN" .env
 
+          # Secure the .env file immediately after population
+          chmod 600 .env
+
           # Login and deploy
           echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
@@ -137,7 +149,7 @@ jobs:
           docker image prune -f
           docker container prune -f
 
-          # Remove .env file for security
-          rm -f .env
+          # Remove only .env.production file
+          # Keep other config files for the case of server reboot
+          # Otherwise Docker will create config files as directories causing "Is a directory" errors
           rm -f .env.production
-          rm -f dozzle-users.yml
