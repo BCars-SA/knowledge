@@ -345,17 +345,17 @@
         proto: tcp
         comment: "SSH access IPv4 only (see SSH config for restrictions)"
 
-    - name: Allow HTTP and HTTPS from specific IPs
+    - name: Allow HTTP and HTTPS from specific IPs on 80-85, 443
       ufw:
         rule: allow
         port: "{{ item.0 }}"
         proto: tcp
         src: "{{ item.1 }}"
         comment: "HTTP/HTTPS access from {{ item.1 }}"
-      loop: "{{ ['80', '443'] | product(allowed_http_ips) | list }}"
+      loop: "{{ ['80', '81', '82', '83', '84', '85', '443'] | product(allowed_http_ips) | list }}"
       when: allowed_http_ips | length > 0
 
-    - name: Allow HTTP and HTTPS from all IPs (when no restrictions)
+    - name: Allow HTTP and HTTPS from all IPs (when no restrictions) on 80-85, 443
       ufw:
         rule: allow
         port: "{{ item }}"
@@ -363,6 +363,11 @@
         comment: "HTTP/HTTPS access (unrestricted)"
       loop:
         - "80"
+        - "81"
+        - "82"
+        - "83"
+        - "84"
+        - "85"
         - "443"
       when: allowed_http_ips | length == 0
 
