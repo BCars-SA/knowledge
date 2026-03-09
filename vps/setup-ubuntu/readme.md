@@ -105,7 +105,7 @@ When running the workflow, provide:
 - **VPS Host**: Your server IP address.
 - **New SSH Port**: Your new SSH port, default is 22, but it's better to use a custom one.
 - **Current SSH Port**: Current VPS SSH port (normally 22).
-- **HTTP IPs**: Comma-separated IPs for authorized HTTP(S) access (80 and 443 port).
+- **HTTP IPs**: Comma-separated IPs for authorized HTTP(S) access (80-85 and 443 port).
 - **SSH Admin IPs**: Comma-separated admin IPs (e.g., `203.0.113.42,198.51.100.0/24`).
 - **SSH User**: `admin` (from create-sudo-user.sh script).
 
