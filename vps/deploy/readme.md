@@ -238,13 +238,19 @@ docker compose logs -t
 
 ## 📊 Monitoring
 
+Basic monitoring combines health checks, resource visibility, and centralized logs:
+
+- **Dozzle**: Web UI for real-time Docker logs for your app and infrastructure containers.
+- **VPS syslogs**: Forward host `/var/log/syslog` into a lightweight container so it can be viewed in Dozzle.
+- **VPS auth logs**: Forward host `/var/log/auth.log` into a lightweight container to watch SSH/authentication events.
+
 ### Health Endpoints
 
 - **API**: `http://your-vps/my-super-service/api/health`
 - **Nginx**: Built-in health checks via Docker
 - **Database**: Internal health checks
 
-### Performance Monitoring
+### Operational Checks
 
 ```bash
 # Container resource usage
@@ -256,6 +262,8 @@ docker compose ps
 # Network usage
 docker network inspect my-super-service-network
 ```
+
+For full Dozzle setup (Docker Compose, Nginx reverse proxy, and authentication), see [Dozzle Monitoring Guide](./monitoring-dozzle.md).
 
 ## 🔄 Updates and Maintenance
 
@@ -294,6 +302,7 @@ cp /mnt/data/redis/appendonly.aof backup/
 ## 📚 Related Documentation
 
 - [VPS Setup Guide](../setup-ubuntu/readme.md)
+- [Dozzle Monitoring Guide](./monitoring-dozzle.md)
 - [Docker Compose Documentation](https://docs.docker.com/compose/)
 - [Nginx Documentation](https://nginx.org/en/docs/)
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
